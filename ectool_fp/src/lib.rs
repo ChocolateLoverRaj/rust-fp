@@ -1,0 +1,9 @@
+pub mod fp_enroll;
+pub mod fp_get_info;
+pub mod fp_get_template;
+pub mod fp_mode;
+pub mod fp_reset;
+pub mod fp_seed;
+pub mod fp_reset_sensor;
+pub mod fp_load_template;
+pub mod fp_get_stats;

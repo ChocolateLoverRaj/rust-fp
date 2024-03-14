@@ -1,0 +1,6 @@
+[workspace]
+members = ["pam_module", "cli", "ectool_fp", "common"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
