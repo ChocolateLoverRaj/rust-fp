@@ -67,15 +67,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("Press your finger to the sensor");
             loop {
                 let fp_mode = fp_get_mode().unwrap();
-                if fp_mode == FpModeOutput::RESET {
+                if fp_mode == FpModeOutput::Reset {
                     break;
                 }
-                if fp_mode == FpModeOutput::ENROLL {
+                if fp_mode == FpModeOutput::Enroll {
                     fp_enroll().unwrap();
                     println!("Press your finger to the sensor")
                 }
             }
-            let template = fp_get_template(0).unwrap();
+            let template = fp_get_template(fp_info.templates_slots_used).unwrap();
             println!(
                 "Done enrolling. Got template of size: {:#?}",
                 template.len()
@@ -127,7 +127,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
         Some(("reset", matches)) => {
             let username = matches.get_one::<String>("user").unwrap();
-            remove_dir_all(get_templates_dir(username)).unwrap();
+            match remove_dir_all(get_templates_dir(username)) {
+                Ok(()) => {},
+                Err(e) => {
+                    match e.kind() {
+                        ErrorKind::NotFound => {},
+                        _ => return Err(Box::new(e))
+                    }
+                }
+            }
         },
         _ => unreachable!("clap should ensure we don't get here"),
     };

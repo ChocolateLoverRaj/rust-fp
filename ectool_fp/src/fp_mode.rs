@@ -4,47 +4,47 @@ use substring::Substring;
 
 #[derive(Copy, Clone, Debug)]
 pub enum FpModeInput {
-    CAPTURE,
-    DEEP_SLEEP,
-    FINGER_DOWN,
-    FINGER_UP,
-    ENROLL,
-    MATCH,
-    RESET,
-    RESET_SENSOR,
-    MAINTAINENCE,
+    Capture,
+    DeepSleep,
+    FingerDown,
+    FingerUp,
+    Enroll,
+    Match,
+    Reset,
+    ResetSensor,
+    Maintenance,
 }
 impl FpModeInput {
     pub fn cli_str(&self) -> &'static str {
         match self {
-            FpModeInput::CAPTURE => "capture",
-            FpModeInput::DEEP_SLEEP => "deepsleep",
-            FpModeInput::FINGER_DOWN => "fingerdown",
-            FpModeInput::FINGER_UP => "fingerup",
-            FpModeInput::ENROLL => "enroll",
-            FpModeInput::MATCH => "match",
-            FpModeInput::RESET => "reset",
-            FpModeInput::RESET_SENSOR => "reset_sensor",
-            FpModeInput::MAINTAINENCE => "maintenance",
+            FpModeInput::Capture => "capture",
+            FpModeInput::DeepSleep => "deepsleep",
+            FpModeInput::FingerDown => "fingerdown",
+            FpModeInput::FingerUp => "fingerup",
+            FpModeInput::Enroll => "enroll",
+            FpModeInput::Match => "match",
+            FpModeInput::Reset => "reset",
+            FpModeInput::ResetSensor => "reset_sensor",
+            FpModeInput::Maintenance => "maintenance",
         }
     }
 }
 
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum FpModeOutput {
-    RESET,
-    ENROLL_PLUS_IMAGE,
-    ENROLL,
-    MATCH,
+    Reset,
+    EnrollPlusImage,
+    Enroll,
+    Match,
 }
 
 impl FpModeOutput {
     pub fn from_code(code: usize) -> Self {
         match code {
-            0x0 => Self::RESET,
-            0x10 => Self::ENROLL,
-            0x30 => Self::ENROLL_PLUS_IMAGE,
-            0x40 => Self::MATCH,
+            0x0 => Self::Reset,
+            0x10 => Self::Enroll,
+            0x30 => Self::EnrollPlusImage,
+            0x40 => Self::Match,
             _ => panic!("Unknown fpmode code: {:#?}", code),
         }
     }

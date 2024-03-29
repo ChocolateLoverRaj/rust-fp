@@ -1,5 +1,4 @@
 use std::io;
-use std::io::{stdout, Write};
 use std::process::{Command};
 
 // TODO: Add more info if needed

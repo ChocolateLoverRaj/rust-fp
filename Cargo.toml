@@ -1,5 +1,5 @@
 [workspace]
-members = ["pam_module", "cli", "ectool_fp", "common"]
+members = ["pam_module", "cli", "ectool_fp", "common", "dbus-interface"]
 resolver = "2"
 
 [workspace.package]

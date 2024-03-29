@@ -1,0 +1,13 @@
+[package]
+name = "dbus-interface"
+edition = "2021"
+version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-std = { version = "1.12.0", features = ["attributes"] }
+common = { version = "0.1.0", path = "../common" }
+ectool_fp = { version = "0.1.0", path = "../ectool_fp" }
+serde = "1.0.197"
+zbus = "4.1.2"

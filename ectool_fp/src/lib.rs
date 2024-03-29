@@ -7,3 +7,4 @@ pub mod fp_seed;
 pub mod fp_reset_sensor;
 pub mod fp_load_template;
 pub mod fp_get_stats;
+pub mod fp_hello;

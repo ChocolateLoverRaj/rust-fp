@@ -32,20 +32,6 @@ use crate::fp_seed::fp_seed;
 
 mod fp_seed;
 
-struct UnsafeSend<'a> {
-    pub conv: Conv<'a>,
-}
-
-impl<'a> Deref for UnsafeSend<'a> {
-    type Target = Conv<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.conv
-    }
-}
-
-unsafe impl<'a> Send for UnsafeSend<'a> {}
-
 struct PamSober;
 pam::pam_hooks!(PamSober);
 
@@ -57,7 +43,7 @@ impl PamHooks for PamSober {
     // This function performs the task of authenticating the user.
     fn sm_authenticate(pamh: &mut PamHandle, args: Vec<&CStr>, _flags: PamFlag) -> PamResultCode {
         if whoami::username() != "root" {
-            return PAM_AUTH_ERR;
+            // return PAM_AUTH_ERR;
         };
 
 
@@ -75,7 +61,7 @@ impl PamHooks for PamSober {
             }
         };
 
-        if single_thread {
+        if single_thread && false {
             let timeout = Duration::from_secs(25);
             pam_try!(conv.send(PAM_TEXT_INFO, &format!("Since KDE has a skill issue, you get {:#?} to unlock with fingerprint. After that, you will have to type your password.", timeout)));
             let username = pam_try!(pamh.get_user(None));
@@ -89,9 +75,9 @@ impl PamHooks for PamSober {
             for file in pam_try!(read_dir(templates_dir).map_err(|e| PAM_AUTH_ERR)) {
                 let file = file.unwrap();
                 fp_load_template(file.path().to_str().unwrap()).unwrap();
-                // println!("Added template: {:#?}", file.path());
+                println!("Added template: {:#?}", file.path());
             }
-            fp_set_mode(FpModeInput::MATCH).unwrap();
+            fp_set_mode(FpModeInput::Match).unwrap();
             pam_try!(conv.send(PAM_TEXT_INFO, "Fingerprint sensor ready"));
             let max_attempts = 5;
             let mut attempt = 0;
@@ -102,7 +88,7 @@ impl PamHooks for PamSober {
                     return PAM_AUTH_ERR;
                 }
                 let fp_mode = fp_get_mode().unwrap();
-                if fp_mode == FpModeOutput::RESET {
+                if fp_mode == FpModeOutput::Reset {
                     let stats = fp_get_stats().unwrap();
                     println!("Stats: {:#?}", stats);
                      match stats.last_matching_finger {
@@ -114,112 +100,76 @@ impl PamHooks for PamSober {
                             } else {
                                 pam_try!(conv.send(PAM_TEXT_INFO, "Invalid fingerprint"));
                                 thread::sleep(Duration::from_millis(500));
-                                fp_set_mode(FpModeInput::MATCH).unwrap();
+                                fp_set_mode(FpModeInput::Match).unwrap();
                             }
                         },
                     };
                 }
             }
         } else {
-            return PAM_SUCCESS;
-        }
+            let (text_tx, text_rx) = unbounded::<bool>();
+            let user = pamh.get_user(None).unwrap();
 
-        let (text_tx, text_rx) = unbounded::<bool>();
-        let user = pamh.get_user(None).unwrap();
-        let conv = Arc::new(Mutex::new(UnsafeSend { conv }));
-        conv.lock()
-            .unwrap()
-            .send(
-                PAM_TEXT_INFO,
-                format!("Hey {}! Single thread: {:#?}", user, single_thread).as_str(),
-            )
-            .unwrap();
+            let thread = thread::spawn(move || {
+                let binding = conv.lock().unwrap();
 
-        let f = move || {
-            let result1 = conv.lock().unwrap();
-            result1
-                .send(
-                    PAM_TEXT_INFO,
-                    format!("Hey {}. f was called", user).as_str(),
-                )
-                .unwrap();
+                let result = binding.conv.send(
+                    PAM_PROMPT_ECHO_OFF,
+                    format!("[cros-fp]: password for {}: ", user).as_str(),
+                );
 
-            // let result = result1
-            //     .send(
-            //         PAM_PROMPT_ECHO_OFF,
-            //         format!("Hey {}. Use FP or type Password", user).as_str(),
-            //     )
-            //     .unwrap();
+                match result {
+                    Ok(option) => {
+                        let password = option.unwrap().to_str().unwrap().to_owned();
+                        if password.is_empty() {
+                            return;
+                        }
 
-            result1
-                .send(
-                    PAM_TEXT_INFO,
-                    format!("Hey {}. U should unlock now", user).as_str(),
-                )
-                .unwrap();
-        };
-        thread::spawn(f).join().unwrap();
-        // f();
-        return PAM_AUTH_ERR;
+                        let mut context = Context::new(
+                            "login",
+                            Some(user.as_str()),
+                            Conversation::with_credentials(user.clone(), password),
+                        )
+                            .expect("Failed to initialize PAM context");
 
-        let thread = thread::spawn(move || {
-            let binding = conv.lock().unwrap();
+                        // Authenticate the user
+                        if context.authenticate(Flag::NONE).is_err() {
+                            binding
+                                .conv
+                                .send(PAM_TEXT_INFO, "Incorrect Password")
+                                .unwrap();
+                            text_tx.send(false).unwrap();
+                            return;
+                        }
 
-            let result = binding.conv.send(
-                PAM_PROMPT_ECHO_OFF,
-                format!("[cros-fp]: password for {}: ", user).as_str(),
-            );
-
-            match result {
-                Ok(option) => {
-                    let password = option.unwrap().to_str().unwrap().to_owned();
-                    if password.is_empty() {
-                        return;
+                        text_tx.send(true).unwrap();
                     }
-                    let mut context = Context::new(
-                        "cros-fp-internal",
-                        Some(user.as_str()),
-                        Conversation::with_credentials(user.clone(), password),
-                    )
-                    .expect("Failed to initialize PAM context");
-
-                    // Authenticate the user
-                    if context.authenticate(Flag::NONE).is_err() {
-                        binding
-                            .conv
-                            .send(PAM_TEXT_INFO, "Incorrect Password")
-                            .unwrap();
-                        text_tx.send(false).unwrap();
-                        return;
-                    }
-
-                    text_tx.send(true).unwrap();
+                    _ => {}
                 }
-                _ => {}
-            }
-        });
+            });
 
-        let (fp_tx, fp_rx) = unbounded::<bool>();
-        // let _ = thread::spawn(move || {
-        //     thread::sleep(Duration::from_secs(5));
-        //     match fp_tx.send(true) {
-        //         Ok(_) => {
-        //             // Message sent successfully
-        //         }
-        //         Err(_) => {
-        //             // This may be because the authentication function already ended. No need to panic.
-        //         }
-        //     };
-        // });
+            let (fp_tx, fp_rx) = unbounded::<bool>();
+            let _ = thread::spawn(move || {
+                thread::sleep(Duration::from_secs(5));
+                match fp_tx.send(true) {
+                    Ok(_) => {
+                        // Message sent successfully
+                    }
+                    Err(_) => {
+                        // This may be because the authentication function already ended. No need to panic.
+                    }
+                };
+            });
 
-        let result = select! {
+            let result = select! {
             recv(text_rx) -> v => v,
             recv(fp_rx) -> v => v
         }
-        .unwrap_or_else(|e| fp_rx.recv().unwrap());
-        match result {
-            true => PAM_SUCCESS,
-            false => PAM_AUTH_ERR,
+                .unwrap_or_else(|e| fp_rx.recv().unwrap());
+            match result {
+                true => PAM_SUCCESS,
+                false => PAM_AUTH_ERR,
+            }
         }
     }
 
