@@ -10,6 +10,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use common::get_templates_dir::get_templates_dir;
+use common::seed::SEED;
 use crossbeam::channel::internal::SelectHandle;
 use crossbeam::channel::unbounded;
 use crossbeam::select;
@@ -26,7 +27,6 @@ use pam::pam_try;
 use pam_client::conv_mock::Conversation;
 use pam_client::{Context, Flag};
 use rand::Rng;
-use common::seed::SEED;
 
 use crate::fp_seed::fp_seed;
 
@@ -45,7 +45,6 @@ impl PamHooks for PamSober {
         if whoami::username() != "root" {
             // return PAM_AUTH_ERR;
         };
-
 
         let single_thread = args
             .get(0)
@@ -91,18 +90,18 @@ impl PamHooks for PamSober {
                 if fp_mode == FpModeOutput::Reset {
                     let stats = fp_get_stats().unwrap();
                     println!("Stats: {:#?}", stats);
-                     match stats.last_matching_finger {
+                    match stats.last_matching_finger {
                         Some(_) => return PAM_SUCCESS,
                         None => {
                             attempt += 1;
                             if attempt == max_attempts {
-                                return PAM_AUTH_ERR
+                                return PAM_AUTH_ERR;
                             } else {
                                 pam_try!(conv.send(PAM_TEXT_INFO, "Invalid fingerprint"));
                                 thread::sleep(Duration::from_millis(500));
                                 fp_set_mode(FpModeInput::Match).unwrap();
                             }
-                        },
+                        }
                     };
                 }
             }
@@ -130,7 +129,7 @@ impl PamHooks for PamSober {
                             Some(user.as_str()),
                             Conversation::with_credentials(user.clone(), password),
                         )
-                            .expect("Failed to initialize PAM context");
+                        .expect("Failed to initialize PAM context");
 
                         // Authenticate the user
                         if context.authenticate(Flag::NONE).is_err() {
@@ -162,10 +161,10 @@ impl PamHooks for PamSober {
             });
 
             let result = select! {
-            recv(text_rx) -> v => v,
-            recv(fp_rx) -> v => v
-        }
-                .unwrap_or_else(|e| fp_rx.recv().unwrap());
+                recv(text_rx) -> v => v,
+                recv(fp_rx) -> v => v
+            }
+            .unwrap_or_else(|e| fp_rx.recv().unwrap());
             match result {
                 true => PAM_SUCCESS,
                 false => PAM_AUTH_ERR,

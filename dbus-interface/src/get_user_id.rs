@@ -1,6 +1,6 @@
-use zbus::{Connection, fdo, message::Header};
 use zbus::fdo::DBusProxy;
 use zbus::names::BusName;
+use zbus::{fdo, message::Header, Connection};
 
 pub async fn get_user_id(header: Header<'_>) -> fdo::Result<u32> {
     let sender = header

@@ -7,3 +7,5 @@ version.workspace = true
 
 [dependencies]
 ectool_fp = { version = "0.1.0", path = "../ectool_fp" }
+serde = { version = "1.0.197", features = ["derive"] }
+zbus = "4.1.2"

@@ -10,7 +10,10 @@ pub fn fp_get_template(index: usize) -> Result<Vec<u8>, io::Error> {
         .arg(index.to_string())
         .output()?;
     match output.status.success() {
-        true =>  Ok(output.stdout),
-        false => Err(io::Error::new(ErrorKind::InvalidData, format!("Process exited with code {}", output.status)))
+        true => Ok(output.stdout),
+        false => Err(io::Error::new(
+            ErrorKind::InvalidData,
+            format!("Process exited with code {}", output.status),
+        )),
     }
 }

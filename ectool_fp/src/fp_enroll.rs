@@ -1,5 +1,5 @@
 use std::io;
-use std::process::{Command};
+use std::process::Command;
 
 pub fn fp_enroll() -> Result<(), io::Error> {
     Command::new("sudo")

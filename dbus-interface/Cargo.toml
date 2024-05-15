@@ -9,5 +9,10 @@ version.workspace = true
 async-std = { version = "1.12.0", features = ["attributes"] }
 common = { version = "0.1.0", path = "../common" }
 ectool_fp = { version = "0.1.0", path = "../ectool_fp" }
+event-listener = "5.3.0"
+futures-signals = "0.3.33"
 serde = "1.0.197"
 zbus = "4.1.2"
+log = "0.4.21"
+mktemp = "0.5.1"
+postcard = { version = "1.0.8", features = ["alloc"] }
