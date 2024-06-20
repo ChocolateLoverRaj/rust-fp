@@ -1,0 +1,14 @@
+[package]
+name = "rust-fp"
+edition = "2021"
+version.workspace = true
+
+[dependencies]
+futures = "0.3.30"
+tokio = { version = "1.38.0", features = ["full"] }
+crosec = { path = "../../crosec-rs/crosec", package = "crosec" }
+async-std = "1.12.0"
+serde = { version = "1.0.203", optional = true }
+
+[features]
+serde = ["dep:serde"]

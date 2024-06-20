@@ -12,7 +12,10 @@ ectool_fp = { version = "0.1.0", path = "../ectool_fp" }
 event-listener = "5.3.0"
 futures-signals = "0.3.33"
 serde = "1.0.197"
-zbus = "4.1.2"
+zbus = "4.3.0"
 log = "0.4.21"
 mktemp = "0.5.1"
 postcard = { version = "1.0.8", features = ["alloc"] }
+rust-fp = { version = "0.1.0", path = "../rust-fp", features = ["serde"] }
+simple_logger = "5.0.0"
+rand = "0.8.5"

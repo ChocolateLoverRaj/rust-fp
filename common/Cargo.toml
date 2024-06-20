@@ -7,5 +7,6 @@ version.workspace = true
 
 [dependencies]
 ectool_fp = { version = "0.1.0", path = "../ectool_fp" }
+rust-fp = { version = "0.1.0", path = "../rust-fp", features = ["serde"] }
 serde = { version = "1.0.197", features = ["derive"] }
 zbus = "4.1.2"

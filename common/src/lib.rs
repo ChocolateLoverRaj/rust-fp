@@ -1,5 +1,2 @@
-pub mod cros_fp_proxy;
-pub mod enrolling_status_data;
-pub mod get_templates_dir;
-pub mod seed;
-pub mod sensor_info;
+pub mod rust_fp_proxy;
+pub mod enroll_step_dbus_output;

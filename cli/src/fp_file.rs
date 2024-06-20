@@ -22,12 +22,19 @@ impl Display for Error {
     }
 }
 
-pub fn get_fp_file() -> Result<String, Error> {
+pub fn get_fp_dir() -> Result<String, Error> {
     Ok(format!(
-        "{}/.var/cros-fp-templates",
+        "{}/.var",
         home_dir()
             .ok_or(Error::HomeDir)?
             .to_str()
             .ok_or(Error::PathBufToStr)?
+    ))
+}
+
+pub fn get_fp_file() -> Result<String, Error> {
+    Ok(format!(
+        "{}/cros-fp-templates",
+        get_fp_dir()?
     ))
 }

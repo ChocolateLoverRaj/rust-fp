@@ -1,10 +1,15 @@
 use std::error::Error;
-use std::ops::Deref;
-use clap::{Arg, Command};
+use async_std::io::stdout;
+
+use clap::{Parser, Subcommand};
+use postcard::from_bytes;
 use tokio::main;
 use zbus::Connection;
+use zbus::export::futures_util::AsyncWriteExt;
 
-use common::cros_fp_proxy::CrosFpProxy;
+use common::enroll_step_dbus_output::{EnrollStepDbusOutput, EnrollStepOutput};
+use common::rust_fp_proxy::RustFpProxy;
+use rust_fp::fingerprint_driver::{MatchedOutput, MatchOutput};
 
 use crate::get_templates::get_templates;
 use crate::set_templates::set_templates;
@@ -14,73 +19,81 @@ mod get_templates;
 mod set_templates;
 mod template;
 
+#[derive(Parser)]
+#[command(version, about)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Get the maximum number of templates that the fingerprint sensor can have stored
+    GetMaxTemplates,
+    Add {
+        label: String,
+    },
+    List,
+    /// Remove a fingerprint template
+    Remove {
+        label: String,
+    },
+    /// Remove all stored fingerprints for a user
+    Clear,
+    /// Test out the fingerprint sensor by matching a finger, and save the updated template if it was updated
+    Match,
+    /// Prints a template in binary to stdout
+    DownloadTemplate {
+        label: String
+    }
+}
+
 #[main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let cmd = Command::new("cros-fp")
-        .subcommand_required(true)
-        .arg_required_else_help(true)
-        .subcommand(Command::new("info"))
-        .subcommand(Command::new("add").arg(Arg::new("label").required(true)))
-        .subcommand(Command::new("list"))
-        .subcommand(
-            Command::new("remove")
-                .arg(Arg::new("label").required(true))
-                .before_help("Remove a fingerprint template"),
-        )
-        .subcommand(Command::new("clear").before_help("Remove all stored fingerprints for a user"))
-        .subcommand(
-            Command::new("match")
-                .before_help("Test out the fingerprint sensor by matching a finger"),
-        );
-    let matches = cmd.get_matches();
-    match matches.subcommand() {
-        Some(("info", _matches)) => {
+    match Cli::parse().command {
+        Commands::GetMaxTemplates => {
             let connection = Connection::system().await?;
-            let proxy = CrosFpProxy::new(&connection).await?;
-            let info = proxy.get_fp_info().await?;
-            println!("Fingerprint sensor info: {:#?}", info);
-            Ok(())
+            let proxy = RustFpProxy::new(&connection).await?;
+            let max_templates = proxy.get_max_templates().await?;
+            println!("Max templates: {max_templates}");
         }
-        Some(("add", matches)) => {
+        Commands::Add { label } => {
             let mut templates = get_templates().await?;
-            let label = matches.get_one::<String>("label").unwrap();
-            match templates.contains_key(label) {
+            match templates.contains_key(&label) {
                 false => {
                     let connection = Connection::system().await?;
-                    let proxy = CrosFpProxy::new(&connection).await?;
-                    let operation_id = proxy.start_enroll().await?;
-                    println!("Waiting for enrolling to start");
-                    proxy.wait_for_operation_start(operation_id).await?;
-                    // sleep(Duration::from_secs(1));
-                    loop {
-                        println!("Press your finger on the sensor");
-                        let result = proxy.get_enroll_progress(operation_id, true).await?;
-                        let progress = result.as_ref().ok_or("No enrolling data")?;
-                        match progress.template.as_ref() {
-                            Some(template) => {
-                                templates.insert(label.to_owned(), template.to_owned());
-                                set_templates(&templates).await?;
-                                println!("Added template");
-                                return Ok(());
+                    let proxy = RustFpProxy::new(&connection).await?;
+                    let mut id = None;
+                    let template = loop {
+                        println!("Touch the FP sensor");
+                        // FIXME: Don't exit if there is a LowQuality error. Just do the enroll step again.
+                        let output: EnrollStepDbusOutput = from_bytes(&proxy.enroll_step(id.unwrap_or_default()).await?)?;
+                        id = Some(output.id);
+                        match output.output {
+                            EnrollStepOutput::InProgress(percentage) => {
+                                println!("Enroll progress: {percentage}%");
                             }
-                            None => {
-                                // Keep going
+                            EnrollStepOutput::Complete(template) => {
+                                break template;
                             }
                         }
-                    }
+                    };
+                    println!("Enroll complete");
+                    templates.insert(label, template);
+                    set_templates(&templates).await?;
+                    println!("Saved template to file");
+                    Ok(())
                 }
-                true => Err("A fingerprint with that label already exists".into()),
-            }
+                true => Err("A fingerprint with that label already exists"),
+            }?;
         }
-        Some(("list", _matches)) => {
+        Commands::List => {
             let templates = get_templates().await?;
             println!("Fingerprints saved for this user:  {:#?}", templates.keys());
-            Ok(())
         }
-        Some(("remove", matches)) => {
+        Commands::Remove { label } => {
             let mut templates = get_templates().await?;
-            let label = matches.get_one::<String>("label").unwrap();
-            match templates.remove(label) {
+            match templates.remove(&label) {
                 Some(_removed_template) => {
                     println!("Removed template {:#?}", label);
                     Ok(())
@@ -89,51 +102,53 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     "Template {:#?} doesn't exist. Existing templates: {:#?}",
                     label,
                     templates.keys().collect::<Vec<_>>()
-                )
-                .into()),
-            }
+                )),
+            }?;
         }
-        Some(("clear", _matches)) => {
+        Commands::Clear => {
             set_templates(&Default::default()).await?;
-            Ok(())
+            println!("Cleared templates");
         }
-        Some(("match", _matches)) => {
-            let connection = Connection::system().await?;
-            let proxy = CrosFpProxy::new(&connection).await?;
-            let templates = get_templates().await?;
-            println!("Matching templates: {:#?}", templates.keys());
+        Commands::Match => {
+            let mut templates = get_templates().await?;
             if templates.len() > 0 {
-                let templates = templates.iter().collect::<Vec<_>>();
-                let operation_id = proxy
-                    .match_finger(
-                        templates
-                            .iter()
-                            .map(|(_label, template)| template.to_owned().to_owned())
-                            .collect(),
-                    )
-                    .await?;
-                println!("Waiting for matching to start");
-                proxy.wait_for_operation_start(operation_id).await?;
-                println!("Ready to match");
-                let result = proxy.get_match_result(operation_id, true).await?;
-                let result = postcard::from_bytes::<Option<Option<u32>>>(&result)?;
-                let result = result.ok_or("No match result")?;
-                match result {
-                    Some(index) => {
-                        println!(
-                            "Matched index {:#?} ({:#?})",
-                            index, templates[index as usize].0
-                        );
+                let connection = Connection::system().await?;
+                let proxy = RustFpProxy::new(&connection).await?;
+                let templates_vec = templates.iter().collect::<Vec<_>>();
+                let output: MatchOutput = from_bytes(&proxy.match_templates(templates_vec.iter().map::<Vec<u8>, _>(|(_k, v)| v.to_vec()).collect()).await?)?;
+                match output {
+                    MatchOutput::Match(MatchedOutput { index, updated_template }) => {
+                        let matched_label = templates_vec[index].0;
+                        println!("Matched: {matched_label}.");
+                        if let Some(updated_template) = updated_template {
+                            println!("Template was updated. Saving updated template...");
+                            templates.insert(matched_label.to_owned(), updated_template);
+                            set_templates(&templates).await?;
+                            println!("Saved updated template");
+                        }
                     }
-                    None => {
-                        println!("No fingerprint for this user watch matched");
+                    MatchOutput::NoMatch(error) => {
+                        println!("No match");
+                        if let Some(error) = error {
+                            println!("Error matching: {error:?}");
+                        }
                     }
-                };
+                }
             } else {
-                println!("No fingerprints saved for this user. Not matching.");
+                println!("No templates saved. Not matching.");
             }
-            Ok(())
+        },
+        Commands::DownloadTemplate {label} => {
+            let templates = get_templates().await?;
+            match templates.get(&label) {
+                Some(template) => {
+                    stdout().write_all(template).await?;
+                },
+                None => {
+                    println!("Template does not exist");
+                }
+            }
         }
-        _ => unreachable!("clap should ensure we don't get here"),
     }
+    Ok(())
 }

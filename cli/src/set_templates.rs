@@ -1,17 +1,19 @@
 use std::fmt::{Display, Formatter};
 use std::io;
 
-use crate::fp_file;
-use async_std::fs::OpenOptions;
+use async_std::fs::{create_dir_all, OpenOptions};
 use async_std::io::WriteExt;
 use rmp_serde::encode;
 
-use crate::fp_file::get_fp_file;
+use crate::fp_file;
+use crate::fp_file::{get_fp_dir, get_fp_file};
 use crate::template::Templates;
 
 #[derive(Debug)]
 pub enum Error {
     Encode(encode::Error),
+    FpDir(fp_file::Error),
+    CreateDir(io::Error),
     FpFile(fp_file::Error),
     Open(io::Error),
     Write(io::Error),
@@ -24,6 +26,12 @@ impl Display for Error {
         match self {
             Self::Encode(e) => {
                 write!(f, "Error encoding file: {:#?}", e)
+            },
+            Self::FpDir(e) => {
+                    write!(f, "Error getting fp file: {:#?}", e)
+            }
+            Self::CreateDir(e) => {
+                write!(f, "Error creating dir: {:#?}", e)
             }
             Self::FpFile(e) => {
                 write!(f, "Error getting fp file: {:#?}", e)
@@ -40,6 +48,7 @@ impl Display for Error {
 
 pub async fn set_templates(templates: &Templates) -> Result<(), Error> {
     let vec = encode::to_vec(templates).map_err(|e| Error::Encode(e))?;
+    create_dir_all(get_fp_dir().map_err(|e| Error::FpDir(e))?).await.map_err(|e| Error::CreateDir(e))?;
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)

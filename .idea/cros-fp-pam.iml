@@ -8,6 +8,7 @@
       <sourceFolder url="file://$MODULE_DIR$/pam_module/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/dbus-interface/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/rust-fp/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
