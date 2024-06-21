@@ -565,6 +565,7 @@ checksum = "7059fff8937831a9ae6f0fe4d658ffabf58f2ca96aa9dec1c889f936f705f216"
 [[package]]
 name = "crosec"
 version = "0.1.0"
+source = "git+https://github.com/ChocolateLoverRaj/crosec-rs/?branch=more-commands#a2d5504d867ec1a3ac41f75ec298feaca3fc9ed9"
 dependencies = [
  "async-std",
  "bytemuck",
