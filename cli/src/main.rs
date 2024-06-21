@@ -1,23 +1,16 @@
 use std::error::Error;
-use async_std::io::stdout;
+use async_std::{main, io::stdout};
 
 use clap::{Parser, Subcommand};
 use postcard::from_bytes;
-use tokio::main;
 use zbus::Connection;
 use zbus::export::futures_util::AsyncWriteExt;
 
-use common::enroll_step_dbus_output::{EnrollStepDbusOutput, EnrollStepOutput};
-use common::rust_fp_proxy::RustFpProxy;
+use rust_fp_common::enroll_step_dbus_output::{EnrollStepDbusOutput, EnrollStepOutput};
+use rust_fp_common::get_templates::get_templates;
+use rust_fp_common::rust_fp_proxy::RustFpProxy;
+use rust_fp_common::set_templates::set_templates;
 use rust_fp::fingerprint_driver::{MatchedOutput, MatchOutput};
-
-use crate::get_templates::get_templates;
-use crate::set_templates::set_templates;
-
-mod fp_file;
-mod get_templates;
-mod set_templates;
-mod template;
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -45,7 +38,7 @@ enum Commands {
     /// Prints a template in binary to stdout
     DownloadTemplate {
         label: String
-    }
+    },
 }
 
 #[main]
@@ -137,13 +130,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 println!("No templates saved. Not matching.");
             }
-        },
-        Commands::DownloadTemplate {label} => {
+        }
+        Commands::DownloadTemplate { label } => {
             let templates = get_templates().await?;
             match templates.get(&label) {
                 Some(template) => {
                     stdout().write_all(template).await?;
-                },
+                }
                 None => {
                     println!("Template does not exist");
                 }

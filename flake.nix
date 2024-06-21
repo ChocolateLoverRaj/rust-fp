@@ -1,25 +1,33 @@
 {
+  description = "A devShell example";
+
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    rust-overlay.url = "github:oxalica/rust-overlay";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = {
-    self,
-    nixpkgs
-  }: let
-    pkgs = import nixpkgs {
-      system = "x86_64-linux";
-    };
-    fhs = pkgs.buildFHSUserEnv {
-      name = "fhs-shell";
-      targetPkgs = pkgs: with pkgs; [
-        rustup
-	clang
-	libclang
-	pam
-      ];
-    };
-  in {
-    devShells.${pkgs.system}.default = fhs.env;
-  };
+  outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        overlays = [ (import rust-overlay) ];
+        pkgs = import nixpkgs {
+          inherit system overlays;
+        };
+      in
+      {
+        devShells.default = with pkgs; mkShell {
+          buildInputs = [
+            openssl
+            pkg-config
+            clang
+            libclang
+            pam
+            (rust-bin.stable.latest.default.override {
+              extensions = [ "rust-src" ];
+            })
+          ];
+        };
+      }
+    );
 }

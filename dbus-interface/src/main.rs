@@ -10,7 +10,7 @@ use std::fmt::{Display, Formatter};
 use std::{io, thread};
 use zbus::export::futures_util::future::join_all;
 use zbus::{connection::Builder, fdo, interface};
-use common::enroll_step_dbus_output::EnrollStepDbusOutput;
+use rust_fp_common::enroll_step_dbus_output::EnrollStepDbusOutput;
 
 struct RustFp {
     driver: Box<dyn OpenedFingerprintDriver>,
