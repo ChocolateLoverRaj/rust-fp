@@ -17,3 +17,4 @@ rand = "0.8.5"
 rust-fp = { version = "0.1.0", path = "../rust-fp" }
 whoami = "1.5.1"
 zbus = "4.3.0"
+ctrlc = { version = "3.4.4", features = ["termination"] }
