@@ -18,10 +18,7 @@
       {
         devShells.default = with pkgs; mkShell {
           buildInputs = [
-            openssl
-            pkg-config
-            clang
-            libclang
+            rustPlatform.bindgenHook
             pam
             (rust-bin.stable.latest.default.override {
               extensions = [ "rust-src" ];
