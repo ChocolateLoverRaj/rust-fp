@@ -88,6 +88,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let mut templates = get_templates().await?;
             match templates.remove(&label) {
                 Some(_removed_template) => {
+                    set_templates(&templates).await?;
                     println!("Removed template {:#?}", label);
                     Ok(())
                 }
