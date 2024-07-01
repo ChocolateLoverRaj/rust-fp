@@ -109,6 +109,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let connection = Connection::system().await?;
                 let proxy = RustFpProxy::new(&connection).await?;
                 let templates_vec = templates.iter().collect::<Vec<_>>();
+                println!("Ready to match...");
                 let output: MatchOutput = from_bytes(&proxy.match_templates(templates_vec.iter().map::<Vec<u8>, _>(|(_k, v)| v.to_vec()).collect()).await?)?;
                 match output {
                     MatchOutput::Match(MatchedOutput { index, updated_template }) => {
