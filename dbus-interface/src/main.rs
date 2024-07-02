@@ -1,83 +1,15 @@
-use log::{error, info};
-use postcard::to_allocvec;
-use rand::random;
+#![warn(unused_crate_dependencies)]
+
+use log::info;
 use rust_fp::drivers::get_drivers;
-use rust_fp::fingerprint_driver::{EnrollStepError, EnrollStepOutput, OpenedFingerprintDriver};
+use rust_fp_common::rust_fp_dbus::RustFp;
 use simple_logger::SimpleLogger;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::{io, thread};
 use zbus::export::futures_util::future::join_all;
-use zbus::{connection::Builder, fdo, interface};
-use rust_fp_common::enroll_step_dbus_output::EnrollStepDbusOutput;
-
-struct RustFp {
-    driver: Box<dyn OpenedFingerprintDriver>,
-    enrolling_id: Option<u32>,
-}
-
-#[interface(name = "org.rust_fp.RustFp")]
-impl RustFp {
-    async fn get_max_templates(&mut self) -> fdo::Result<u64> {
-        let max_templates = self
-            .driver
-            .get_max_templates()
-            .map_err(|_e| fdo::Error::Failed("Error getting max templates".into()))?;
-        Ok(max_templates as u64)
-    }
-
-    async fn enroll_step(&mut self, id: u32) -> fdo::Result<Vec<u8>> {
-        let id = match self.enrolling_id {
-            None => {
-                let id = random();
-                self.enrolling_id = Some(id);
-                Ok(id)
-            }
-            Some(enrolling_id) => {
-                if enrolling_id != id {
-                    // TODO: Have a timeout or something so a faulty app doesn't disable the FP sensor until this program is restarted
-                    Err(fdo::Error::Failed(
-                        "Something else is in the middle of enrolling. Wait until it's done."
-                            .into(),
-                    ))
-                } else {
-                    Ok(id)
-                }
-            }
-        }?;
-        let output = self
-            .driver
-            .start_or_continue_enroll()
-            .await
-            .map_err(|error| {
-                fdo::Error::Failed(
-                    match error {
-                        EnrollStepError::GenericError => {
-                            error!("Generic error: {error:?}");
-                            "Error"
-                        },
-                        EnrollStepError::LowQuality => "Low Quality",
-                    }
-                    .into(),
-                )
-            })?;
-        if let EnrollStepOutput::Complete(_) = output {
-            self.enrolling_id = None;
-        }
-        info!("Enroll id: {id}");
-        Ok(to_allocvec(&EnrollStepDbusOutput { id, output }).unwrap())
-    }
-
-    async fn match_templates(&mut self, templates: Vec<Vec<u8>>) -> fdo::Result<Vec<u8>> {
-        let output = self
-            .driver
-            .match_templates(&templates)
-            .await
-            .map_err(|e| fdo::Error::Failed(format!("{e:?}")))?;
-        Ok(to_allocvec(&output).unwrap())
-    }
-}
+use zbus::connection::Builder;
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn Error>> {

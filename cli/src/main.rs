@@ -3,12 +3,12 @@ use async_std::{main, io::stdout};
 
 use clap::{Parser, Subcommand};
 use postcard::from_bytes;
+use rust_fp_common::rust_fp_dbus::RustFpProxy;
 use zbus::Connection;
 use zbus::export::futures_util::AsyncWriteExt;
 
 use rust_fp_common::enroll_step_dbus_output::{EnrollStepDbusOutput, EnrollStepOutput};
 use rust_fp_common::get_templates::get_templates;
-use rust_fp_common::rust_fp_proxy::RustFpProxy;
 use rust_fp_common::set_templates::set_templates;
 use rust_fp::fingerprint_driver::{MatchedOutput, MatchOutput};
 

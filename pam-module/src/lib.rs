@@ -1,3 +1,5 @@
+#![warn(unused_crate_dependencies)]
+
 extern crate pam;
 extern crate rand;
 
@@ -16,7 +18,7 @@ use zbus::blocking::Connection;
 
 use rust_fp::fingerprint_driver::{MatchedOutput, MatchOutput};
 use rust_fp_common::get_templates::get_templates;
-use rust_fp_common::rust_fp_proxy::RustFpProxyBlocking;
+use rust_fp_common::rust_fp_dbus::RustFpProxyBlocking;
 use rust_fp_common::set_templates::set_templates;
 
 use crate::wait_until_unlock::wait_until_unlock;
