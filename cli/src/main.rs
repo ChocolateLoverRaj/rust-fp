@@ -1,16 +1,18 @@
+use async_std::{io::stdout, main};
 use std::error::Error;
-use async_std::{main, io::stdout};
 
 use clap::{Parser, Subcommand};
 use postcard::from_bytes;
-use rust_fp_common::rust_fp_dbus::RustFpProxy;
-use zbus::Connection;
+use rust_fp_common::{
+    enroll_step_dbus_result::EnrollStepDbusOutput,
+    rust_fp_dbus::RustFpProxy,
+};
 use zbus::export::futures_util::AsyncWriteExt;
+use zbus::Connection;
 
-use rust_fp_common::enroll_step_dbus_output::{EnrollStepDbusOutput, EnrollStepOutput};
+use rust_fp::fingerprint_driver::{EnrollStepOutput, MatchOutput, MatchedOutput};
 use rust_fp_common::get_templates::get_templates;
 use rust_fp_common::set_templates::set_templates;
-use rust_fp::fingerprint_driver::{MatchedOutput, MatchOutput};
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -37,7 +39,7 @@ enum Commands {
     Match,
     /// Prints a template in binary to stdout
     DownloadTemplate {
-        label: String
+        label: String,
     },
 }
 
@@ -60,9 +62,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     let template = loop {
                         println!("Touch the FP sensor");
                         // FIXME: Don't exit if there is a LowQuality error. Just do the enroll step again.
-                        let output: EnrollStepDbusOutput = from_bytes(&proxy.enroll_step(id.unwrap_or_default()).await?)?;
-                        id = Some(output.id);
-                        match output.output {
+                        let output = loop {
+                            let output: EnrollStepDbusOutput =
+                                from_bytes(&proxy.enroll_step(id.unwrap_or_default()).await?)?;
+                            id = Some(output.id);
+                            match output.result {
+                                Ok(output) => {
+                                    break output;
+                                }
+                                Err(error) => {
+                                    println!("{error:?}. Try again.");
+                                }
+                            }
+                        };
+                        match output {
                             EnrollStepOutput::InProgress(percentage) => {
                                 println!("Enroll progress: {percentage}%");
                             }
@@ -110,9 +123,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let proxy = RustFpProxy::new(&connection).await?;
                 let templates_vec = templates.iter().collect::<Vec<_>>();
                 println!("Ready to match...");
-                let output: MatchOutput = from_bytes(&proxy.match_templates(templates_vec.iter().map::<Vec<u8>, _>(|(_k, v)| v.to_vec()).collect()).await?)?;
+                let output: MatchOutput = from_bytes(
+                    &proxy
+                        .match_templates(
+                            templates_vec
+                                .iter()
+                                .map::<Vec<u8>, _>(|(_k, v)| v.to_vec())
+                                .collect(),
+                        )
+                        .await?,
+                )?;
                 match output {
-                    MatchOutput::Match(MatchedOutput { index, updated_template }) => {
+                    MatchOutput::Match(MatchedOutput {
+                        index,
+                        updated_template,
+                    }) => {
                         let matched_label = templates_vec[index].0;
                         println!("Matched: {matched_label}.");
                         if let Some(updated_template) = updated_template {

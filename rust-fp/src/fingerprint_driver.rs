@@ -9,6 +9,7 @@ pub struct FingerprintDriver {
     pub open_and_init: Box<dyn Fn() -> BoxFuture<'static, io::Result<Box<dyn OpenedFingerprintDriver>>>>,
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 pub enum EnrollStepError {
     GenericError,
@@ -16,6 +17,7 @@ pub enum EnrollStepError {
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug)]
 pub enum EnrollStepOutput {
     InProgress(u8),
     Complete(Vec<u8>),

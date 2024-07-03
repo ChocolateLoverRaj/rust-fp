@@ -1,11 +1,12 @@
 use rust_fp::fingerprint_driver::OpenedFingerprintDriver;
 use zbus::{fdo, interface};
-use log::{error, info};
+use log::info;
 use postcard::to_allocvec;
 use rand::random;
-use rust_fp::fingerprint_driver::{EnrollStepError, EnrollStepOutput};
+use rust_fp::fingerprint_driver::EnrollStepOutput;
 
-use crate::enroll_step_dbus_output::EnrollStepDbusOutput;
+use crate::enroll_step_dbus_result::EnrollStepDbusOutput;
+
 
 pub struct RustFp {
     pub driver: Box<dyn OpenedFingerprintDriver>,
@@ -47,27 +48,18 @@ impl RustFp {
                 }
             }
         }?;
-        let output = self
+        let result = self
             .driver
             .start_or_continue_enroll()
-            .await
-            .map_err(|error| {
-                fdo::Error::Failed(
-                    match error {
-                        EnrollStepError::GenericError => {
-                            error!("Generic error: {error:?}");
-                            "Error"
-                        },
-                        EnrollStepError::LowQuality => "Low Quality",
-                    }
-                    .into(),
-                )
-            })?;
-        if let EnrollStepOutput::Complete(_) = output {
+            .await;
+        if let Ok(EnrollStepOutput::Complete(_)) = result {
             self.enrolling_id = None;
         }
-        info!("Enroll id: {id}");
-        Ok(to_allocvec(&EnrollStepDbusOutput { id, output }).unwrap())
+        info!("Enroll id: {id}. Result: {result:?}.");
+        Ok(to_allocvec(&EnrollStepDbusOutput {
+            id,
+            result
+        }).unwrap())
     }
 
     async fn match_templates(&mut self, templates: Vec<Vec<u8>>) -> fdo::Result<Vec<u8>> {
