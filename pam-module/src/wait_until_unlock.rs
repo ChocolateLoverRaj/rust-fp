@@ -1,7 +1,7 @@
 use pollster::FutureExt;
-use zbus::{MatchRule, MessageStream};
 use zbus::export::futures_util::StreamExt;
 use zbus::message::Type;
+use zbus::{MatchRule, MessageStream};
 
 /// This function exits after unlock
 pub fn wait_until_unlock() {
@@ -15,8 +15,12 @@ pub fn wait_until_unlock() {
         .unwrap()
         .msg_type(Type::Signal)
         .build();
-    let mut stream = Box::pin(MessageStream::for_match_rule(match_rule, &connection, None).block_on().unwrap()
-        .map(|message| message.unwrap().body().deserialize::<bool>().unwrap())
-        .filter(|&message| async move { !message }));
+    let mut stream = Box::pin(
+        MessageStream::for_match_rule(match_rule, &connection, None)
+            .block_on()
+            .unwrap()
+            .map(|message| message.unwrap().body().deserialize::<bool>().unwrap())
+            .filter(|&message| async move { !message }),
+    );
     stream.next().block_on();
 }

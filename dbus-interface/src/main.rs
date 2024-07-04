@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::{io, thread};
-use zbus::export::futures_util::future::join_all;
 use zbus::connection::Builder;
+use zbus::export::futures_util::future::join_all;
 
 #[async_std::main]
 async fn main() -> Result<(), Box<dyn Error>> {

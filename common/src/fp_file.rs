@@ -33,8 +33,5 @@ pub fn get_fp_dir() -> Result<String, Error> {
 }
 
 pub fn get_fp_file() -> Result<String, Error> {
-    Ok(format!(
-        "{}/cros-fp-templates",
-        get_fp_dir()?
-    ))
+    Ok(format!("{}/cros-fp-templates", get_fp_dir()?))
 }

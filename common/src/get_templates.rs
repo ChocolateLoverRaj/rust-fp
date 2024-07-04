@@ -42,16 +42,16 @@ impl Display for Error {
 pub async fn get_templates() -> Result<Templates, Error> {
     match OpenOptions::new()
         .read(true)
-        .open(get_fp_file().map_err(|e| Error::FpFile(e))?)
+        .open(get_fp_file().map_err( Error::FpFile)?)
         .await
     {
         Ok(mut file) => {
             let mut buf = Default::default();
             file.read_to_end(&mut buf)
                 .await
-                .map_err(|e| Error::Read(e))?;
+                .map_err(Error::Read)?;
             let templates =
-                rmp_serde::from_slice::<Templates>(&buf).map_err(|e| Error::Decode(e))?;
+                rmp_serde::from_slice::<Templates>(&buf).map_err( Error::Decode)?;
             Ok(templates)
         }
         Err(e) => match e.kind() {

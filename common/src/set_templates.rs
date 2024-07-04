@@ -26,9 +26,9 @@ impl Display for Error {
         match self {
             Self::Encode(e) => {
                 write!(f, "Error encoding file: {:#?}", e)
-            },
+            }
             Self::FpDir(e) => {
-                    write!(f, "Error getting fp file: {:#?}", e)
+                write!(f, "Error getting fp file: {:#?}", e)
             }
             Self::CreateDir(e) => {
                 write!(f, "Error creating dir: {:#?}", e)
@@ -47,14 +47,16 @@ impl Display for Error {
 }
 
 pub async fn set_templates(templates: &Templates) -> Result<(), Error> {
-    let vec = encode::to_vec(templates).map_err(|e| Error::Encode(e))?;
-    create_dir_all(get_fp_dir().map_err(|e| Error::FpDir(e))?).await.map_err(|e| Error::CreateDir(e))?;
+    let vec = encode::to_vec(templates).map_err(Error::Encode)?;
+    create_dir_all(get_fp_dir().map_err(Error::FpDir)?)
+        .await
+        .map_err(Error::CreateDir)?;
     let mut file = OpenOptions::new()
         .write(true)
         .create(true)
-        .open(get_fp_file().map_err(|e| Error::FpFile(e))?)
+        .open(get_fp_file().map_err(Error::FpFile)?)
         .await
-        .map_err(|e| Error::Open(e))?;
-    file.write(&vec).await.map_err(|e| Error::Write(e))?;
+        .map_err(Error::Open)?;
+    file.write(&vec).await.map_err(Error::Write)?;
     Ok(())
 }

@@ -1,12 +1,15 @@
+use futures::future::BoxFuture;
 use std::error::Error;
 use std::io;
-use futures::future::BoxFuture;
+
+type OpenAndInit =
+    Box<dyn Fn() -> BoxFuture<'static, io::Result<Box<dyn OpenedFingerprintDriver>>>>;
 
 pub struct FingerprintDriver {
     /// Returns `true` if this device has a  fingerprint sensor compatible with this driver
     pub is_compatible: Box<dyn Fn() -> BoxFuture<'static, io::Result<bool>>>,
     pub name: &'static str,
-    pub open_and_init: Box<dyn Fn() -> BoxFuture<'static, io::Result<Box<dyn OpenedFingerprintDriver>>>>,
+    pub open_and_init: OpenAndInit,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -41,6 +44,7 @@ pub enum NoMatchError {
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug)]
 pub enum MatchOutput {
     Match(MatchedOutput),
     NoMatch(Option<NoMatchError>),
@@ -48,6 +52,9 @@ pub enum MatchOutput {
 
 pub trait OpenedFingerprintDriver: Sync + Send {
     fn start_or_continue_enroll(&mut self) -> BoxFuture<EnrollStepResult>;
-    fn get_max_templates(&mut self) -> Result<usize, ()>;
-    fn match_templates<'a>(&'a mut self, templates: &'a Vec<Vec<u8>>) -> BoxFuture<Result<MatchOutput, Box<dyn Error>>>;
+    fn get_max_templates(&mut self) -> anyhow::Result<usize>;
+    fn match_templates<'a>(
+        &'a mut self,
+        templates: &'a [Vec<u8>],
+    ) -> BoxFuture<Result<MatchOutput, Box<dyn Error>>>;
 }

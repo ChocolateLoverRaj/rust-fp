@@ -3,7 +3,6 @@
 pub mod drivers;
 pub mod fingerprint_driver;
 
-
 // use futures::future::join_all;
 // use std::collections::HashMap;
 // use std::error::Error;

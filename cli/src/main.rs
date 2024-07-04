@@ -3,10 +3,7 @@ use std::error::Error;
 
 use clap::{Parser, Subcommand};
 use postcard::from_bytes;
-use rust_fp_common::{
-    enroll_step_dbus_result::EnrollStepDbusOutput,
-    rust_fp_dbus::RustFpProxy,
-};
+use rust_fp_common::{enroll_step_dbus_result::EnrollStepDbusOutput, rust_fp_dbus::RustFpProxy};
 use zbus::export::futures_util::AsyncWriteExt;
 use zbus::Connection;
 
@@ -118,7 +115,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
         Commands::Match => {
             let mut templates = get_templates().await?;
-            if templates.len() > 0 {
+            if !templates.is_empty() {
                 let connection = Connection::system().await?;
                 let proxy = RustFpProxy::new(&connection).await?;
                 let templates_vec = templates.iter().collect::<Vec<_>>();
@@ -133,6 +130,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         )
                         .await?,
                 )?;
+                println!("Output: {output:?}");
                 match output {
                     MatchOutput::Match(MatchedOutput {
                         index,
