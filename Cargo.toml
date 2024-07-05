@@ -1,6 +1,3 @@
 [workspace]
 members = ["pam-module", "cli", "common", "dbus-interface", "rust-fp"]
 resolver = "2"
-
-[workspace.package]
-version = "0.1.0"
