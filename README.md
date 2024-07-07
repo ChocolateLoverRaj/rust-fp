@@ -2,6 +2,7 @@
 A better fingerprint library than `libfprint`
 
 ## Why
+- `libfprint` does not support Chromebook fingerprint readers
 - `libfprint` seems to not support fingerprint readers with their own built-in matching
 - `libfprint` is written in C, not Rust
 - `libfprint` is hard to use
@@ -18,7 +19,7 @@ A better fingerprint library than `libfprint`
 
 ## Status
 ### Drivers
-Currently, `rust-fp` is not yet written. It will eventually support Chromebook fingerprint readers, and other people can add drivers for their own fp sensors.
+Currently, `rust-fp` supports Chromebook fingerprint readers. Other people can add drivers for their own fp sensors.
 
 ### Integration with desktop environments
 Desktop Environment | Status      | Comments
