@@ -1,28 +1,35 @@
-use std::collections::HashSet;
-use std::error::Error;
-use std::hash::{DefaultHasher, Hash, Hasher};
-use std::io;
-use std::io::ErrorKind;
-use std::time::Duration;
-
-use async_std::fs::File;
-use async_std::task::sleep;
-use crosec::commands::fp_download::{fp_download_template, FpTemplate};
-use crosec::commands::fp_get_encryption_status::{fp_get_encryption_status, FpEncryptionStatus};
-use crosec::commands::fp_info::{fp_info, EcResponseFpInfo};
-use crosec::commands::fp_mode::{fp_mode, FpMode};
-use crosec::commands::fp_set_seed::fp_set_seed;
-use crosec::commands::fp_upload_template::fp_upload_template;
-use crosec::commands::get_protocol_info::{get_protocol_info, EcResponseGetProtocolInfo};
-use crosec::commands::get_uptime_info::ec_cmd_get_uptime_info;
-use crosec::wait_event::event::{EcMkbpEvent, EcMkbpEventType};
-use crosec::wait_event::fingerprint::{
-    EcMkbpEventFingerprintEnrollError, EcMkbpEventFingerprintMatchResult,
-    EcMkbpEventFingerprintNoMatchError, EcMkbpEventFingerprintRust,
+use std::{
+    collections::HashSet,
+    error::Error,
+    hash::{DefaultHasher, Hash, Hasher},
+    io::{self, ErrorKind},
+    time::Duration,
 };
-use crosec::wait_event::host_event::HostEventCode;
-use crosec::wait_event::wait_event_async;
-use crosec::CROS_FP_PATH;
+
+use async_std::{fs::File, task::sleep};
+use crosec::{
+    commands::{
+        fp_download::{fp_download_template, FpTemplate},
+        fp_get_encryption_status::{fp_get_encryption_status, FpEncryptionStatus},
+        fp_info::{fp_info, EcResponseFpInfo},
+        fp_mode::{fp_mode, FpMode},
+        fp_set_context::fp_set_context,
+        fp_set_seed::fp_set_seed,
+        fp_upload_template::fp_upload_template,
+        get_protocol_info::{get_protocol_info, EcResponseGetProtocolInfo},
+        get_uptime_info::ec_cmd_get_uptime_info,
+    },
+    wait_event::{
+        event::{EcMkbpEvent, EcMkbpEventType},
+        fingerprint::{
+            EcMkbpEventFingerprintEnrollError, EcMkbpEventFingerprintMatchResult,
+            EcMkbpEventFingerprintNoMatchError, EcMkbpEventFingerprintRust,
+        },
+        host_event::HostEventCode,
+        wait_event_async,
+    },
+    CROS_FP_PATH,
+};
 use futures::future::BoxFuture;
 
 use crate::drivers::GetFingerprintDriver;
@@ -103,22 +110,58 @@ impl OpenedCrosFp {
             self.loaded_templates_hashes.clear();
         }
     }
+
+    /// Sets the context. The context must be set before enrolling and uploading
+    /// The context gets reset when the sensor gets reset
+    /// It is possible that the seed doesn't get reset but the context does
+    fn set_context(&mut self) {
+        fp_set_context(&mut self.file, [0xaa; 32]).unwrap();
+        // Setting context always clears templates, even if the context was previously set to the same value
+        self.loaded_templates_hashes.clear();
+    }
+
+    fn check_if_templates_got_cleared(&mut self) {
+        if !self.loaded_templates_hashes.is_empty() {
+            let info = fp_info(&mut self.file).unwrap();
+            let stored_loaded_templates_count = self.loaded_templates_hashes.len() as u16;
+            let actual_loaded_templates_count = info.template_valid;
+            if actual_loaded_templates_count == stored_loaded_templates_count {
+                // Assume templates have not changed
+            } else if info.template_valid == 0 {
+                self.loaded_templates_hashes.clear();
+            } else {
+                // Something is wrong. Panic instead of causing undefined behaviour
+                panic!("Expected {stored_loaded_templates_count} or 0 templates to be loaded, but actually {actual_loaded_templates_count} templates are loaded.")
+            }
+        }
+    }
 }
 
 impl OpenedFingerprintDriver for OpenedCrosFp {
     fn start_or_continue_enroll(&mut self) -> BoxFuture<EnrollStepResult> {
         Box::pin(async {
             self.ensure_seed_is_set().await;
+            self.check_if_templates_got_cleared();
             // Clear templates if there are no more slots left
             if self.loaded_templates_hashes.len() == self.fp_info.template_max as usize {
-                fp_mode(&mut self.file, FpMode::ResetSensor as u32)
-                    .map_err(|_e| EnrollStepError::GenericError)?;
-                self.loaded_templates_hashes.clear();
+                // TODO: We may need to set fp mode to Reset before doing this
+                self.set_context();
+            } else if self.loaded_templates_hashes.is_empty() {
+                // Unless we already started enrolling, set the context since it may not be set
+                let fp_mode = fp_mode(&mut self.file, FpMode::DontChange as u32).unwrap();
+                match FpMode::from_repr(fp_mode) {
+                    Some(FpMode::EnrollSession) => {
+                        // Don't set context because we assume it is already set and you can't set context while enrolling
+                    }
+                    Some(FpMode::Reset) => {
+                        self.set_context();
+                    }
+                    _ => {
+                        // The fp should not be in any other mode. We can't set context unless it's reset
+                        panic!("Unknown fp mode: {fp_mode}")
+                    }
+                }
             }
-            // if self.loaded_templates_hashes.len() > 0 {
-            //     fp_mode(&mut self.file, FpMode::ResetSensor as u32).map_err(|_e| EnrollStepError::GenericError)?;
-            //     self.loaded_templates_hashes.clear();
-            // }
             fp_mode(
                 &mut self.file,
                 FpMode::EnrollSession as u32 | FpMode::EnrollImage as u32,
@@ -181,6 +224,8 @@ impl OpenedFingerprintDriver for OpenedCrosFp {
                     hasher.finish()
                 })
                 .collect::<Vec<_>>();
+            self.check_if_templates_got_cleared();
+            // FIXME: Figure out why the uploading is in a loop
             let fingerprint_event = loop {
                 self.ensure_seed_is_set().await;
                 println!(
@@ -192,8 +237,7 @@ impl OpenedFingerprintDriver for OpenedCrosFp {
                 {
                     fp_mode(&mut self.file, FpMode::Reset as u32)
                         .map_err(|_e| format!("Error doing {:?}", FpMode::Reset))?;
-                    fp_mode(&mut self.file, FpMode::ResetSensor as u32)
-                        .map_err(|_e| format!("Error doing {:?}", FpMode::ResetSensor))?;
+                    self.set_context();
                     // Without waiting a bit, the template uploading can fail.
                     // Maybe 10ms is enough, idk what is the smallest amount that works 99% of the time.
                     sleep(Duration::from_millis(10)).await;
