@@ -42,7 +42,7 @@
           _cargoLock = {
             lockFile = ./Cargo.lock;
             outputHashes = {
-              "crosec-0.1.0" = "sha256-/G0/ClCZUdBv0a8fl/UUsXVCHD2V4Ts97oyQvfi23hE=";
+              "crosec-0.1.0" = "sha256-ZDNdrp3CyM6AcJyOXOcscw9g+u1EAfTIvbLbDf07aiQ=";
             };
           };
           rust-fp-dbus-interface = with pkgs; with builtins; rustPlatform.buildRustPackage
