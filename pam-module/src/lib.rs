@@ -51,10 +51,11 @@ impl PamHooks for RustFpPam {
         thread::spawn({
             let tx = tx.clone();
             move || {
-                wait_until_unlock();
-                // Useful for debugging
-                // Command::new("play").arg("https://www.myinstants.com/media/sounds/sudden-suspense-sound-effect.mp3").output().unwrap();
-                tx.send(Message::Result(PAM_ABORT)).unwrap();
+                if wait_until_unlock().is_ok() {
+                    // Useful for debugging
+                    // Command::new("play").arg("https://www.myinstants.com/media/sounds/sudden-suspense-sound-effect.mp3").output().unwrap();
+                    tx.send(Message::Result(PAM_ABORT)).unwrap();
+                }
             }
         });
         // Actual fingerprint matching
