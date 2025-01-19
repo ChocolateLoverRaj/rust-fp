@@ -14,6 +14,7 @@ use pam::module::{PamHandle, PamHooks};
 use pam::pam_try;
 use pollster::block_on;
 use postcard::from_bytes;
+use rust_fp_common::fp_file::get_fp_file;
 use zbus::blocking::Connection;
 
 use rust_fp::fingerprint_driver::{MatchOutput, MatchedOutput};
@@ -60,12 +61,14 @@ impl PamHooks for RustFpPam {
         });
         // Actual fingerprint matching
         thread::spawn({
+            let user = pamh.get_user(None).unwrap();
             let tx = tx.clone();
             move || {
                 let authenticate = {
                     let tx = tx.clone();
                     move || -> PamResultCode {
-                        let mut templates = block_on(get_templates()).unwrap();
+                        let fp_file = get_fp_file(format!("/home/{}", user));
+                        let mut templates = block_on(get_templates(&fp_file)).unwrap();
                         if !templates.is_empty() {
                             let connection = Connection::system().unwrap();
                             let proxy = RustFpProxyBlocking::new(&connection).unwrap();
@@ -96,7 +99,7 @@ impl PamHooks for RustFpPam {
                                             );
                                             templates
                                                 .insert(matched_label.to_owned(), updated_template);
-                                            block_on(set_templates(&templates)).unwrap();
+                                            block_on(set_templates(&fp_file, &templates)).unwrap();
                                             println!("Saved updated template");
                                         }
                                         return PAM_SUCCESS;
