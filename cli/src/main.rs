@@ -1,4 +1,6 @@
 use async_std::{io::stdout, main};
+use directories::UserDirs;
+use rust_fp_common::fp_file::get_fp_file;
 use std::error::Error;
 
 use clap::{Parser, Subcommand};
@@ -42,6 +44,7 @@ enum Commands {
 
 #[main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let fp_file = get_fp_file(UserDirs::new().unwrap().home_dir().display());
     match Cli::parse().command {
         Commands::GetMaxTemplates => {
             let connection = Connection::system().await?;
@@ -50,7 +53,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("Max templates: {max_templates}");
         }
         Commands::Add { label } => {
-            let mut templates = get_templates().await?;
+            let mut templates = get_templates(&fp_file).await?;
             match templates.contains_key(&label) {
                 false => {
                     let connection = Connection::system().await?;
@@ -83,7 +86,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     };
                     println!("Enroll complete");
                     templates.insert(label, template);
-                    set_templates(&templates).await?;
+                    set_templates(&fp_file, &templates).await?;
                     println!("Saved template to file");
                     Ok(())
                 }
@@ -91,14 +94,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }?;
         }
         Commands::List => {
-            let templates = get_templates().await?;
+            let templates = get_templates(&fp_file).await?;
             println!("Fingerprints saved for this user:  {:#?}", templates.keys());
         }
         Commands::Remove { label } => {
-            let mut templates = get_templates().await?;
+            let mut templates = get_templates(&fp_file).await?;
             match templates.remove(&label) {
                 Some(_removed_template) => {
-                    set_templates(&templates).await?;
+                    set_templates(&fp_file, &templates).await?;
                     println!("Removed template {:#?}", label);
                     Ok(())
                 }
@@ -110,11 +113,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }?;
         }
         Commands::Clear => {
-            set_templates(&Default::default()).await?;
+            set_templates(&fp_file, &Default::default()).await?;
             println!("Cleared templates");
         }
         Commands::Match => {
-            let mut templates = get_templates().await?;
+            let mut templates = get_templates(&fp_file).await?;
             if !templates.is_empty() {
                 let connection = Connection::system().await?;
                 let proxy = RustFpProxy::new(&connection).await?;
@@ -141,7 +144,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         if let Some(updated_template) = updated_template {
                             println!("Template was updated. Saving updated template...");
                             templates.insert(matched_label.to_owned(), updated_template);
-                            set_templates(&templates).await?;
+                            set_templates(&fp_file, &templates).await?;
                             println!("Saved updated template");
                         }
                     }
@@ -157,7 +160,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
         Commands::DownloadTemplate { label } => {
-            let templates = get_templates().await?;
+            let templates = get_templates(&fp_file).await?;
             match templates.get(&label) {
                 Some(template) => {
                     stdout().write_all(template).await?;
