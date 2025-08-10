@@ -114,7 +114,7 @@ sudo cp target/release/rust-fp /usr/local/bin
 ```
 
 ## Usage
-All you really need to do is enroll some fingerprints with the `rust-fp` CLI. Depending on your Chromebook, you will a maximum number of templates that can be loaded onto the fingerprint sensor at a time. It's probably 5. Just typing `rust-fp` will show the help page. Run `rust-fp enroll` to enroll your fingerprints. Then lock the screen and you should be able to unlock with either your password or an enrolled fingerprint.
+All you really need to do is enroll some fingerprints with the `rust-fp` CLI. Depending on your Chromebook, you will a maximum number of templates that can be loaded onto the fingerprint sensor at a time. It's probably 5. Just typing `rust-fp` will show the help page. Run `rust-fp add <name>` to enroll your fingerprints. Then lock the screen and you should be able to unlock with either your password or an enrolled fingerprint.
 
 ## Troubleshooting
 - See [the list of known issues](https://github.com/ChocolateLoverRaj/rust-fp/labels/bug).
